@@ -20,6 +20,7 @@ public class MainFrame extends JFrame {
     private final JComboBox<Integer> comboCores = new JComboBox<>(new Integer[]{1, 2, 4});
 
     private final GanttPanel ganttPanel;
+    private final JScrollPane ganttScrollPane;
     private final Timer autoSimulationTimer;
     private final JButton btnPlayPause = new JButton("▶ Play");
     private final JSlider speedSlider = new JSlider(100, 1000, 500);
@@ -32,7 +33,6 @@ public class MainFrame extends JFrame {
 
         setLayout(new BorderLayout());
 
-        // Painel Superior com Botão de Remoção
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 8));
         JButton btnAddCustomTask = new JButton("┼ Nova Tarefa");
         JButton btnAddRandomTask = new JButton("🎲 Aleatória");
@@ -53,17 +53,22 @@ public class MainFrame extends JFrame {
 
         add(topPanel, BorderLayout.NORTH);
 
-        // Configuração da Lista de Tarefas
         taskList.setFont(new Font("Monospaced", Font.PLAIN, 12));
         taskList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
+        comboCores.setSelectedItem(2);
+
         ganttPanel = new GanttPanel(2);
-        
-        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(taskList), ganttPanel);
+        ganttScrollPane = new JScrollPane(
+            ganttPanel,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS
+        );
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(taskList), ganttScrollPane);
         splitPane.setResizeWeight(0.60);
         add(splitPane, BorderLayout.CENTER);
 
-        // Rodapé
         JPanel bottomPanel = new JPanel(new BorderLayout());
         JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         statusPanel.add(lblStatus);
@@ -76,10 +81,8 @@ public class MainFrame extends JFrame {
         bottomPanel.add(speedPanel, BorderLayout.EAST);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Timer de Execução Automática
         autoSimulationTimer = new Timer(speedSlider.getValue(), e -> executarCiclo());
 
-        // Listeners dos Botões
         btnAddCustomTask.addActionListener(e -> abrirDialogoNovaTarefa());
         btnAddRandomTask.addActionListener(e -> adicionarTarefaExemplo());
         btnRemoveTask.addActionListener(e -> removerTarefaSelecionada());
@@ -87,11 +90,7 @@ public class MainFrame extends JFrame {
         btnPlayPause.addActionListener(e -> alternarSimulacao());
         btnReset.addActionListener(e -> reiniciarSimulacao());
 
-        comboCores.addActionListener(e -> {
-            int numCores = (Integer) comboCores.getSelectedItem();
-            ganttPanel.resetCores(numCores);
-            lblStatus.setText(String.format("Tempo de Simulação: %d ms | Cores Ativos: %d", currentTime, numCores));
-        });
+        comboCores.addActionListener(e -> reiniciarSimulacao());
 
         speedSlider.addChangeListener(e -> autoSimulationTimer.setDelay(speedSlider.getValue()));
     }
@@ -117,7 +116,7 @@ public class MainFrame extends JFrame {
     }
 
     private void abrirDialogoNovaTarefa() {
-        JTextField txtNome = new JTextField("T" + (tasks.size() + 1) + "_Critica");
+        JTextField txtNome = new JTextField("T" + (tasks.size() + 1));
         JTextField txtExecucao = new JTextField("5");
         JTextField txtDeadline = new JTextField("8");
         JTextField txtPrioridade = new JTextField("1");
@@ -146,7 +145,13 @@ public class MainFrame extends JFrame {
                 int deadlineRelativo = Integer.parseInt(txtDeadline.getText().trim());
                 int prioridade = Integer.parseInt(txtPrioridade.getText().trim());
 
-                Task t = new Task(tasks.size() + 1, nome, execucao, currentTime + deadlineRelativo, prioridade);
+                if (execucao <= 0 || deadlineRelativo <= 0) {
+                    JOptionPane.showMessageDialog(this, "Valores de execução e deadline devem ser positivos.", "Erro", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                Task t = new Task(tasks.size() + 1, nome, execucao, deadlineRelativo, prioridade);
+                t.setAbsoluteDeadline(currentTime + deadlineRelativo);
                 tasks.add(t);
                 atualizarUI();
             } catch (NumberFormatException ex) {
@@ -158,8 +163,9 @@ public class MainFrame extends JFrame {
     private void adicionarTarefaExemplo() {
         int id = tasks.size() + 1;
         int duracao = 3 + (int) (Math.random() * 5);
-        int deadline = currentTime + duracao + 4 + (int) (Math.random() * 6);
-        Task t = new Task(id, "T" + id + "_Rand", duracao, deadline, 1);
+        int deadlineRelativo = duracao + 4 + (int) (Math.random() * 6);
+        Task t = new Task(id, "T" + id + "_Rand", duracao, deadlineRelativo, 1);
+        t.setAbsoluteDeadline(currentTime + deadlineRelativo);
         tasks.add(t);
         atualizarUI();
     }
@@ -170,17 +176,46 @@ public class MainFrame extends JFrame {
 
         scheduler.schedule(tasks, numCores, currentTime);
 
+        boolean temTarefaAtiva = false;
         int coresUsados = 0;
+
         for (Task t : tasks) {
-            if ((t.getState() == Task.State.READY || t.getState() == Task.State.RUNNING) && coresUsados < numCores) {
-                t.tickExecution();
-                ganttPanel.registrarTick(currentTime, coresUsados, t.getName());
-                coresUsados++;
+            if (t.getState() == Task.State.READY || t.getState() == Task.State.RUNNING) {
+                temTarefaAtiva = true;
+                if (coresUsados < numCores) {
+                    t.setState(Task.State.RUNNING);
+                    t.tickExecution();
+                    ganttPanel.registrarTick(currentTime, coresUsados, t.getName());
+                    coresUsados++;
+                } else {
+                    t.setState(Task.State.READY);
+                }
             }
         }
 
-        lblStatus.setText(String.format("Tempo de Simulação: %d ms | Cores Ativos: %d", currentTime, numCores));
+        while (coresUsados < numCores) {
+            ganttPanel.registrarTick(currentTime, coresUsados, "IDLE");
+            coresUsados++;
+        }
+
+        // Interrompe o Timer automaticamente quando todas as tarefas terminam
+        if (!temTarefaAtiva && !tasks.isEmpty()) {
+            if (autoSimulationTimer.isRunning()) {
+                autoSimulationTimer.stop();
+                btnPlayPause.setText("▶ Play");
+            }
+            lblStatus.setText(String.format("✓ Simulação Concluída (%d ms) | Todos os processos finalizados | CPUs: %d", currentTime, numCores));
+        } else {
+            lblStatus.setText(String.format("Tempo de Simulação: %d ms | Cores Ativos: %d", currentTime, numCores));
+        }
+
         atualizarUI();
+
+        SwingUtilities.invokeLater(() -> {
+            ganttScrollPane.validate();
+            JScrollBar horizontal = ganttScrollPane.getHorizontalScrollBar();
+            horizontal.setValue(horizontal.getMaximum());
+        });
     }
 
     private void reiniciarSimulacao() {
@@ -203,11 +238,11 @@ public class MainFrame extends JFrame {
         listModel.clear();
         for (Task t : tasks) {
             int laxity = t.getLaxity(currentTime);
-            String alertaZeroLaxity = (laxity <= 0 && t.getRemainingTime() > 0) ? " ⚠️ [ZERO LAXITY - PRIORIDADE MÁXIMA]" : "";
+            String alertaZeroLaxity = (laxity <= 0 && t.getRemainingTime() > 0 && t.getState() != Task.State.FINISHED) ? " ⚠️ [ZERO LAXITY - PRIORIDADE MÁXIMA]" : "";
 
             listModel.addElement(String.format(
                 "[%-8s] %-16s | Restante: %2d ms | Deadline Abs: %2d ms | Laxity: %3d | CPU: %2d ms%s",
-                t.getState(), t.getName(), t.getRemainingTime(), t.getDeadline(), laxity, t.getCpuCyclesConsumed(), alertaZeroLaxity
+                t.getState(), t.getName(), t.getRemainingTime(), t.getAbsoluteDeadline(), laxity, t.getCpuCyclesConsumed(), alertaZeroLaxity
             ));
         }
     }

@@ -5,27 +5,29 @@ public class Task {
 
     private final int id;
     private final String name;
-    private int executionTime;
+    private final int executionTime;
     private int remainingTime;
-    private int deadline;
+    private final int relativeDeadline;
+    private int absoluteDeadline;
     private int priority;
     private State state;
     
     private long cpuCyclesConsumed;
     private long busyWaitingCycles;
 
-    public Task(int id, String name, int executionTime, int deadline, int priority) {
+    public Task(int id, String name, int executionTime, int relativeDeadline, int priority) {
         this.id = id;
         this.name = name;
         this.executionTime = executionTime;
         this.remainingTime = executionTime;
-        this.deadline = deadline;
+        this.relativeDeadline = relativeDeadline;
+        this.absoluteDeadline = relativeDeadline;
         this.priority = priority;
         this.state = State.READY;
     }
 
     public int getLaxity(int currentTime) {
-        return deadline - currentTime - remainingTime;
+        return absoluteDeadline - currentTime - remainingTime;
     }
 
     public void tickExecution() {
@@ -43,8 +45,9 @@ public class Task {
         cpuCyclesConsumed++;
     }
 
-    public void reset(int currentTime) {
+    public void reset(int newCurrentTime) {
         this.remainingTime = executionTime;
+        this.absoluteDeadline = newCurrentTime + relativeDeadline;
         this.cpuCyclesConsumed = 0;
         this.busyWaitingCycles = 0;
         this.state = State.READY;
@@ -54,7 +57,9 @@ public class Task {
     public String getName() { return name; }
     public int getExecutionTime() { return executionTime; }
     public int getRemainingTime() { return remainingTime; }
-    public int getDeadline() { return deadline; }
+    public int getRelativeDeadline() { return relativeDeadline; }
+    public int getAbsoluteDeadline() { return absoluteDeadline; }
+    public void setAbsoluteDeadline(int absoluteDeadline) { this.absoluteDeadline = absoluteDeadline; }
     public int getPriority() { return priority; }
     public State getState() { return state; }
     public void setState(State state) { this.state = state; }
