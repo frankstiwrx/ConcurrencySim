@@ -5,15 +5,14 @@ public class Task {
 
     private final int id;
     private final String name;
-    private int executionTime;     // Tempo total necessário
-    private int remainingTime;     // Tempo restante para concluir
-    private int deadline;          // Instante limite absoluto
-    private int priority;          // Prioridade base
+    private int executionTime;
+    private int remainingTime;
+    private int deadline;
+    private int priority;
     private State state;
     
-    // Métricas
-    private long cpuCyclesConsumed; // Ciclos gastos
-    private long busyWaitingCycles; // Ciclos gastos em Spinlock (Busy Waiting)
+    private long cpuCyclesConsumed;
+    private long busyWaitingCycles;
 
     public Task(int id, String name, int executionTime, int deadline, int priority) {
         this.id = id;
@@ -44,11 +43,19 @@ public class Task {
         cpuCyclesConsumed++;
     }
 
-    // Getters e Setters
+    public void reset(int currentTime) {
+        this.remainingTime = executionTime;
+        this.cpuCyclesConsumed = 0;
+        this.busyWaitingCycles = 0;
+        this.state = State.READY;
+    }
+
     public int getId() { return id; }
     public String getName() { return name; }
+    public int getExecutionTime() { return executionTime; }
     public int getRemainingTime() { return remainingTime; }
     public int getDeadline() { return deadline; }
+    public int getPriority() { return priority; }
     public State getState() { return state; }
     public void setState(State state) { this.state = state; }
     public long getCpuCyclesConsumed() { return cpuCyclesConsumed; }

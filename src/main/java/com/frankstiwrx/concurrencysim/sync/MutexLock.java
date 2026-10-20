@@ -8,7 +8,7 @@ public class MutexLock {
     public synchronized void lock(Task task) throws InterruptedException {
         while (locked) {
             task.setState(Task.State.BLOCKED);
-            wait(); // Libera CPU e aguarda notificação
+            wait();
         }
         locked = true;
         task.setState(Task.State.RUNNING);
@@ -16,6 +16,6 @@ public class MutexLock {
 
     public synchronized void unlock() {
         locked = false;
-        notify(); // Acorda a próxima thread da fila
+        notify();
     }
 }

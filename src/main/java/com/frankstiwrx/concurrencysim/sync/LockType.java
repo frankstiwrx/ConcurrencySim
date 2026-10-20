@@ -1,13 +1,21 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.frankstiwrx.concurrencysim.sync;
 
-/**
- *
- * @author frank
- */
-public class LockType {
-    
+public enum LockType {
+    SPINLOCK("Spinlock (Busy Waiting)"),
+    MUTEX("Mutex (Bloqueio Passivo)");
+
+    private final String descricao;
+
+    LockType(String descricao) {
+        this.descricao = descricao;
+    }
+
+    public String getDescricao() {
+        return descricao;
+    }
+
+    @Override
+    public String toString() {
+        return descricao;
+    }
 }

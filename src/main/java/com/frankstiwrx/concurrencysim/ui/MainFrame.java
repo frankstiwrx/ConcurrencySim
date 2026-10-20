@@ -2,6 +2,7 @@ package com.frankstiwrx.concurrencysim.ui;
 
 import com.frankstiwrx.concurrencysim.model.Task;
 import com.frankstiwrx.concurrencysim.scheduler.EDZLScheduler;
+import com.frankstiwrx.concurrencysim.sync.LockType;
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
@@ -14,45 +15,47 @@ public class MainFrame extends JFrame {
 
     private final DefaultListModel<String> listModel = new DefaultListModel<>();
     private final JLabel lblStatus = new JLabel("Tempo de Simulação: 0 ms");
+    private final JComboBox<LockType> comboLock = new JComboBox<>(LockType.values());
 
     public MainFrame() {
         super("Simulador Visual de Concorrência & Escalonamento EDZL");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(900, 600);
+        setSize(950, 600);
         setLocationRelativeTo(null);
 
         setLayout(new BorderLayout());
 
-        // Painel de Controle
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton btnAddTask = new JButton("┼ Adicionar Tarefa");
         JButton btnStep = new JButton("▶ Próximo Ciclo (Tick)");
-        JComboBox<String> comboSync = new JComboBox<>(new String[]{"Mutex (Passivo)", "Spinlock (Busy Wait)"});
+        JButton btnReset = new JButton("🔄 Reiniciar");
 
         topPanel.add(btnAddTask);
         topPanel.add(btnStep);
+        topPanel.add(btnReset);
         topPanel.add(new JLabel("Mecanismo de Bloqueio:"));
-        topPanel.add(comboSync);
+        topPanel.add(comboLock);
 
         add(topPanel, BorderLayout.NORTH);
 
-        // Lista de Tarefas / Status
         JList<String> taskList = new JList<>(listModel);
+        taskList.setFont(new Font("Monospaced", Font.PLAIN, 12));
         add(new JScrollPane(taskList), BorderLayout.CENTER);
 
-        // Rodapé
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         bottomPanel.add(lblStatus);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Eventos
         btnAddTask.addActionListener(e -> adicionarTarefaExemplo());
         btnStep.addActionListener(e -> executarCiclo());
+        btnReset.addActionListener(e -> reiniciarSimulacao());
     }
 
     private void adicionarTarefaExemplo() {
         int id = tasks.size() + 1;
-        Task t = new Task(id, "Task-" + id, 5, currentTime + 10, 1);
+        int duracao = 4 + (int) (Math.random() * 5);
+        int deadline = currentTime + duracao + 5 + (int) (Math.random() * 6);
+        Task t = new Task(id, "Tarefa-" + id, duracao, deadline, 1);
         tasks.add(t);
         atualizarUI();
     }
@@ -61,7 +64,6 @@ public class MainFrame extends JFrame {
         currentTime++;
         scheduler.schedule(tasks, 2, currentTime);
 
-        // Executa 1 ciclo da tarefa de maior prioridade
         for (Task t : tasks) {
             if (t.getState() == Task.State.READY || t.getState() == Task.State.RUNNING) {
                 t.tickExecution();
@@ -73,21 +75,23 @@ public class MainFrame extends JFrame {
         atualizarUI();
     }
 
+    private void reiniciarSimulacao() {
+        currentTime = 0;
+        for (Task t : tasks) {
+            t.reset(currentTime);
+        }
+        lblStatus.setText("Tempo de Simulação: 0 ms");
+        atualizarUI();
+    }
+
     private void atualizarUI() {
         listModel.clear();
         for (Task t : tasks) {
             int laxity = t.getLaxity(currentTime);
             listModel.addElement(String.format(
-                "%s | Estado: %s | Execucao Restante: %d ms | Deadline: %d | Laxity: %d | Ciclos CPU: %d",
-                t.getName(), t.getState(), t.getRemainingTime(), t.getDeadline(), laxity, t.getCpuCyclesConsumed()
+                "[%s] %-10s | Execução Restante: %2d ms | Deadline: %2d ms | Laxity: %3d | Ciclos CPU: %2d | BusyWait: %2d",
+                t.getState(), t.getName(), t.getRemainingTime(), t.getDeadline(), laxity, t.getCpuCyclesConsumed(), t.getBusyWaitingCycles()
             ));
         }
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignored) {}
-            new MainFrame().setVisible(true);
-        });
     }
 }

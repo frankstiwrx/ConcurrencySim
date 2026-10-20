@@ -8,9 +8,8 @@ public class Spinlock {
 
     public void lock(Task task) {
         while (!locked.compareAndSet(false, true)) {
-            // Conta ciclo de CPU desperdiçado em busy waiting
             task.tickBusyWait();
-            Thread.onSpinWait(); // Dica de baixo nível para a JVM/CPU
+            Thread.onSpinWait();
         }
     }
 
